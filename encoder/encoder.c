@@ -22,12 +22,12 @@ volatile uint8_t buttonPress=0;
 
 uint16_t encoder();
 
-uint16_t precision=2;					//Increments per click
-uint16_t currentDuty=100;				//Current Duty Value
-uint16_t maxDutyValue=200;				//Maximum Duty Value 
-
-uint16_t currentFreq=200;				//Current Frequency Value
-uint16_t maxFreqValue=600;		 		//Maximum range
+uint16_t precision=1;					//Increments per click
+uint16_t currentDuty;					//Current Duty Value
+uint16_t maxDutyValue=102;				//Maximum Duty Value 
+  
+uint16_t currentFreq=100;				//Current Frequency Value
+uint16_t maxFreqValue=200;		 		//Maximum range
 
 uint8_t On=0;							// Off / On toggle
 
@@ -36,9 +36,11 @@ int main()
 	DDRB |= (1<<PMW);					// PWM port set to output
 	DDRD |= (1<<DBG);					// Debug LED to output
 	DDRD &= ~(1<<INT);					// Ensure interrupt pin is input
+
+	currentDuty=maxDutyValue/10;		// Start at 10% duty cycle
 	
  	ICR1 = currentFreq;					// Frequency = 8,000,000/ICR1 
- 	OCR1A = ICR1/2;						// Duty cycle = OCR1A/2 = 50%
+ 	OCR1A = currentDuty;				// Duty cycle
  	
  	TCCR1A |= (1<<COM1A1);				// Clear OC1A/OC1B on Compare Match, set OC1A/OC1B at TOP
   	TCCR1A |= (1<<WGM11);	 			// Fast PWM Mode 14 TOP=ICR1
@@ -67,17 +69,17 @@ int main()
      } 
     else 
      {
-	  OCR1A=encoder(maxDutyValue);
+	  currentDuty=encoder(maxDutyValue,currentDuty);
+	  OCR1A=currentDuty;
       DDRB |= (1<<PMW);					// PWM port set to output
 	 }
  }	
 } 
-uint16_t encoder(uint16_t max_encoder_value)
+uint16_t encoder(uint16_t max_encoder_value,uint16_t encoder_value)
 {
  static uint8_t state=0x03;					//Start with both pins high
  static uint8_t damper;						//Prevents over reporting
- static uint16_t encoder_value=50;			//The value
-
+ 
  state <<=2;								//Save previous state
  if(PINB & (1 << ACW)) state |=(1<<0);		//Port 1
  if(PINB & (1 << CW)) state |=(1<<1); 		//Port 2
@@ -102,7 +104,7 @@ ISR(INT0_vect)
 {
 	buttonPress=1;
 	debounce();
-//	debounce();
+	debounce();
 //	debounce();
 }	
 
