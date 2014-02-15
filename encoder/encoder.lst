@@ -1,0 +1,284 @@
+
+encoder.elf:     file format elf32-avr
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         0000018a  00000000  00000000  00000094  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .data         0000000e  00800060  0000018a  0000021e  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  2 .bss          00000002  0080006e  0080006e  0000022c  2**0
+                  ALLOC
+  3 .stab         00000cf0  00000000  00000000  0000022c  2**2
+                  CONTENTS, READONLY, DEBUGGING
+  4 .stabstr      000009c6  00000000  00000000  00000f1c  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  5 .comment      00000011  00000000  00000000  000018e2  2**0
+                  CONTENTS, READONLY
+
+Disassembly of section .text:
+
+00000000 <__vectors>:
+   0:	12 c0       	rjmp	.+36     	; 0x26 <__ctors_end>
+   2:	2a c0       	rjmp	.+84     	; 0x58 <__bad_interrupt>
+   4:	29 c0       	rjmp	.+82     	; 0x58 <__bad_interrupt>
+   6:	28 c0       	rjmp	.+80     	; 0x58 <__bad_interrupt>
+   8:	27 c0       	rjmp	.+78     	; 0x58 <__bad_interrupt>
+   a:	26 c0       	rjmp	.+76     	; 0x58 <__bad_interrupt>
+   c:	25 c0       	rjmp	.+74     	; 0x58 <__bad_interrupt>
+   e:	24 c0       	rjmp	.+72     	; 0x58 <__bad_interrupt>
+  10:	23 c0       	rjmp	.+70     	; 0x58 <__bad_interrupt>
+  12:	22 c0       	rjmp	.+68     	; 0x58 <__bad_interrupt>
+  14:	21 c0       	rjmp	.+66     	; 0x58 <__bad_interrupt>
+  16:	20 c0       	rjmp	.+64     	; 0x58 <__bad_interrupt>
+  18:	1f c0       	rjmp	.+62     	; 0x58 <__bad_interrupt>
+  1a:	1e c0       	rjmp	.+60     	; 0x58 <__bad_interrupt>
+  1c:	1d c0       	rjmp	.+58     	; 0x58 <__bad_interrupt>
+  1e:	1c c0       	rjmp	.+56     	; 0x58 <__bad_interrupt>
+  20:	1b c0       	rjmp	.+54     	; 0x58 <__bad_interrupt>
+  22:	1a c0       	rjmp	.+52     	; 0x58 <__bad_interrupt>
+  24:	19 c0       	rjmp	.+50     	; 0x58 <__bad_interrupt>
+
+00000026 <__ctors_end>:
+  26:	11 24       	eor	r1, r1
+  28:	1f be       	out	0x3f, r1	; 63
+  2a:	cf ed       	ldi	r28, 0xDF	; 223
+  2c:	cd bf       	out	0x3d, r28	; 61
+
+0000002e <__do_copy_data>:
+  2e:	10 e0       	ldi	r17, 0x00	; 0
+  30:	a0 e6       	ldi	r26, 0x60	; 96
+  32:	b0 e0       	ldi	r27, 0x00	; 0
+  34:	ea e8       	ldi	r30, 0x8A	; 138
+  36:	f1 e0       	ldi	r31, 0x01	; 1
+  38:	02 c0       	rjmp	.+4      	; 0x3e <__SP_L__+0x1>
+  3a:	05 90       	lpm	r0, Z+
+  3c:	0d 92       	st	X+, r0
+  3e:	ae 36       	cpi	r26, 0x6E	; 110
+  40:	b1 07       	cpc	r27, r17
+  42:	d9 f7       	brne	.-10     	; 0x3a <__do_copy_data+0xc>
+
+00000044 <__do_clear_bss>:
+  44:	10 e0       	ldi	r17, 0x00	; 0
+  46:	ae e6       	ldi	r26, 0x6E	; 110
+  48:	b0 e0       	ldi	r27, 0x00	; 0
+  4a:	01 c0       	rjmp	.+2      	; 0x4e <.do_clear_bss_start>
+
+0000004c <.do_clear_bss_loop>:
+  4c:	1d 92       	st	X+, r1
+
+0000004e <.do_clear_bss_start>:
+  4e:	a0 37       	cpi	r26, 0x70	; 112
+  50:	b1 07       	cpc	r27, r17
+  52:	e1 f7       	brne	.-8      	; 0x4c <.do_clear_bss_loop>
+  54:	6b d0       	rcall	.+214    	; 0x12c <main>
+  56:	97 c0       	rjmp	.+302    	; 0x186 <_exit>
+
+00000058 <__bad_interrupt>:
+  58:	d3 cf       	rjmp	.-90     	; 0x0 <__vectors>
+
+0000005a <buttonPress>:
+ } 
+   
+ }
+uint8_t buttonPress()
+{
+ if(PIND & (1 << SW))
+  5a:	85 9b       	sbis	0x10, 5	; 16
+  5c:	06 c0       	rjmp	.+12     	; 0x6a <buttonPress+0x10>
+ {
+	debounce();
+  5e:	55 d0       	rcall	.+170    	; 0x10a <debounce>
+	if(PIND & (1 << SW)) return(1);
+  60:	80 b3       	in	r24, 0x10	; 16
+  62:	85 fb       	bst	r24, 5
+  64:	88 27       	eor	r24, r24
+  66:	80 f9       	bld	r24, 0
+  68:	08 95       	ret
+ }	
+ return(0);
+  6a:	80 e0       	ldi	r24, 0x00	; 0
+}	 
+  6c:	08 95       	ret
+
+0000006e <encoder>:
+{
+ static uint8_t state=0x03;					//Start with both pins high
+ static uint8_t damper;						//Prevents over reporting
+ static uint16_t encoder_value=50;			//The value
+
+ state <<=2;								//Save previous state
+  6e:	20 91 6a 00 	lds	r18, 0x006A
+  72:	22 0f       	add	r18, r18
+  74:	22 0f       	add	r18, r18
+  76:	20 93 6a 00 	sts	0x006A, r18
+ if(PINB & (1 << ACW)) state |=(1<<0);		//Port 1
+  7a:	b1 9b       	sbis	0x16, 1	; 22
+  7c:	03 c0       	rjmp	.+6      	; 0x84 <encoder+0x16>
+  7e:	21 60       	ori	r18, 0x01	; 1
+  80:	20 93 6a 00 	sts	0x006A, r18
+ if(PINB & (1 << CW)) state |=(1<<1); 		//Port 2
+  84:	b0 9b       	sbis	0x16, 0	; 22
+  86:	05 c0       	rjmp	.+10     	; 0x92 <encoder+0x24>
+  88:	20 91 6a 00 	lds	r18, 0x006A
+  8c:	22 60       	ori	r18, 0x02	; 2
+  8e:	20 93 6a 00 	sts	0x006A, r18
+ state &= 0x0f;								//Remove high order nibble
+  92:	20 91 6a 00 	lds	r18, 0x006A
+  96:	2f 70       	andi	r18, 0x0F	; 15
+  98:	20 93 6a 00 	sts	0x006A, r18
+ if(damper)
+  9c:	30 91 6f 00 	lds	r19, 0x006F
+  a0:	33 23       	and	r19, r19
+  a2:	31 f0       	breq	.+12     	; 0xb0 <encoder+0x42>
+  {if(state!=15) return(encoder_value); 	//Prevent over reporting
+  a4:	2f 30       	cpi	r18, 0x0F	; 15
+  a6:	09 f0       	breq	.+2      	; 0xaa <encoder+0x3c>
+  a8:	2b c0       	rjmp	.+86     	; 0x100 <__stack+0x21>
+   else damper=0;}
+  aa:	10 92 6f 00 	sts	0x006F, r1
+  ae:	28 c0       	rjmp	.+80     	; 0x100 <__stack+0x21>
+
+ if(state==0x0e && encoder_value < (max_encoder_value - precision))
+  b0:	2e 30       	cpi	r18, 0x0E	; 14
+  b2:	81 f4       	brne	.+32     	; 0xd4 <encoder+0x66>
+  b4:	20 91 6b 00 	lds	r18, 0x006B
+  b8:	30 91 6c 00 	lds	r19, 0x006C
+  bc:	40 91 68 00 	lds	r20, 0x0068
+  c0:	50 91 69 00 	lds	r21, 0x0069
+  c4:	84 1b       	sub	r24, r20
+  c6:	95 0b       	sbc	r25, r21
+  c8:	28 17       	cp	r18, r24
+  ca:	39 07       	cpc	r19, r25
+  cc:	c8 f4       	brcc	.+50     	; 0x100 <__stack+0x21>
+  {
+   encoder_value += precision;
+  ce:	24 0f       	add	r18, r20
+  d0:	35 1f       	adc	r19, r21
+  d2:	0f c0       	rjmp	.+30     	; 0xf2 <__stack+0x13>
+   damper=1;
+  }
+ if(state==0x0d && encoder_value > precision)
+  d4:	2d 30       	cpi	r18, 0x0D	; 13
+  d6:	a1 f4       	brne	.+40     	; 0x100 <__stack+0x21>
+  d8:	20 91 6b 00 	lds	r18, 0x006B
+  dc:	30 91 6c 00 	lds	r19, 0x006C
+  e0:	80 91 68 00 	lds	r24, 0x0068
+  e4:	90 91 69 00 	lds	r25, 0x0069
+  e8:	82 17       	cp	r24, r18
+  ea:	93 07       	cpc	r25, r19
+  ec:	48 f4       	brcc	.+18     	; 0x100 <__stack+0x21>
+  {
+   encoder_value -= precision;
+  ee:	28 1b       	sub	r18, r24
+  f0:	39 0b       	sbc	r19, r25
+  f2:	30 93 6c 00 	sts	0x006C, r19
+  f6:	20 93 6b 00 	sts	0x006B, r18
+   damper=1;   
+  fa:	81 e0       	ldi	r24, 0x01	; 1
+  fc:	80 93 6f 00 	sts	0x006F, r24
+  } 
+ return(encoder_value); 
+ 100:	80 91 6b 00 	lds	r24, 0x006B
+ 104:	90 91 6c 00 	lds	r25, 0x006C
+} 
+ 108:	08 95       	ret
+
+0000010a <debounce>:
+ 10a:	2f ea       	ldi	r18, 0xAF	; 175
+
+0000010c <outerloop>:
+ 10c:	32 e8       	ldi	r19, 0x82	; 130
+
+0000010e <innerloop>:
+ 10e:	00 00       	nop
+ 110:	00 00       	nop
+ 112:	00 00       	nop
+ 114:	31 50       	subi	r19, 0x01	; 1
+ 116:	30 30       	cpi	r19, 0x00	; 0
+ 118:	d1 f7       	brne	.-12     	; 0x10e <innerloop>
+ 11a:	21 50       	subi	r18, 0x01	; 1
+ 11c:	20 30       	cpi	r18, 0x00	; 0
+ 11e:	b1 f7       	brne	.-20     	; 0x10c <outerloop>
+ 120:	4c e0       	ldi	r20, 0x0C	; 12
+	...
+
+00000124 <adjust>:
+ 124:	41 50       	subi	r20, 0x01	; 1
+ 126:	40 30       	cpi	r20, 0x00	; 0
+ 128:	e9 f7       	brne	.-6      	; 0x124 <adjust>
+ 12a:	08 95       	ret
+
+0000012c <main>:
+
+uint8_t frequencyMode=0;
+
+int main()
+{
+	DDRB |= (1<<PMW);					// PWM port set to output
+ 12c:	bb 9a       	sbi	0x17, 3	; 23
+	DDRD &= ~(1<<SW);					// Switch to input
+ 12e:	8d 98       	cbi	0x11, 5	; 17
+	PORTD |= (1<<SW);					// Pull up enabled
+ 130:	95 9a       	sbi	0x12, 5	; 18
+	
+ 	ICR1 = currentFreq;					// Frequency = 8,000,000/ICR1 
+ 132:	80 91 62 00 	lds	r24, 0x0062
+ 136:	90 91 63 00 	lds	r25, 0x0063
+ 13a:	95 bd       	out	0x25, r25	; 37
+ 13c:	84 bd       	out	0x24, r24	; 36
+ 	OCR1A = ICR1/2;						// Duty cycle = OCR1A/2 = 50%
+ 13e:	84 b5       	in	r24, 0x24	; 36
+ 140:	95 b5       	in	r25, 0x25	; 37
+ 142:	96 95       	lsr	r25
+ 144:	87 95       	ror	r24
+ 146:	9b bd       	out	0x2b, r25	; 43
+ 148:	8a bd       	out	0x2a, r24	; 42
+ 	
+ 	TCCR1A |= (1<<COM1A1);				// Clear OC1A/OC1B on Compare Match, set OC1A/OC1B at TOP
+ 14a:	8f b5       	in	r24, 0x2f	; 47
+ 14c:	80 68       	ori	r24, 0x80	; 128
+ 14e:	8f bd       	out	0x2f, r24	; 47
+  	TCCR1A |= (1<<WGM11);	 			// Fast PWM Mode 14 TOP=ICR1
+ 150:	8f b5       	in	r24, 0x2f	; 47
+ 152:	82 60       	ori	r24, 0x02	; 2
+ 154:	8f bd       	out	0x2f, r24	; 47
+  	TCCR1B |= (1<<WGM12);
+ 156:	8e b5       	in	r24, 0x2e	; 46
+ 158:	88 60       	ori	r24, 0x08	; 8
+ 15a:	8e bd       	out	0x2e, r24	; 46
+  	TCCR1B |= (1<<WGM13);
+ 15c:	8e b5       	in	r24, 0x2e	; 46
+ 15e:	80 61       	ori	r24, 0x10	; 16
+ 160:	8e bd       	out	0x2e, r24	; 46
+  	
+   	TCCR1B |= (1<<CS10);				
+ 162:	8e b5       	in	r24, 0x2e	; 46
+ 164:	81 60       	ori	r24, 0x01	; 1
+ 166:	8e bd       	out	0x2e, r24	; 46
+ 	
+	sei(); 
+ 168:	78 94       	sei
+
+	ICR1=currentFreq;
+	OCR1A=currentDuty;
+  }	
+  */
+	ICR1=currentFreq;
+ 16a:	80 91 62 00 	lds	r24, 0x0062
+ 16e:	90 91 63 00 	lds	r25, 0x0063
+ 172:	95 bd       	out	0x25, r25	; 37
+ 174:	84 bd       	out	0x24, r24	; 36
+	OCR1A=encoder(maxDutyValue);
+ 176:	80 91 64 00 	lds	r24, 0x0064
+ 17a:	90 91 65 00 	lds	r25, 0x0065
+ 17e:	77 df       	rcall	.-274    	; 0x6e <encoder>
+ 180:	9b bd       	out	0x2b, r25	; 43
+ 182:	8a bd       	out	0x2a, r24	; 42
+ 184:	f2 cf       	rjmp	.-28     	; 0x16a <main+0x3e>
+
+00000186 <_exit>:
+ 186:	f8 94       	cli
+
+00000188 <__stop_program>:
+ 188:	ff cf       	rjmp	.-2      	; 0x188 <__stop_program>

@@ -1,0 +1,1217 @@
+   1               	# 1 "debounce.S"
+   1               	; Debounce delay routine.
+   0               	
+   2               	;
+   3               	; A 20 millisecond delay when called from an 8Mhz processor which is
+   4               	; intended for a switch debounce delay.
+   5               	; 
+   6               	; Use only registers r18 - r27 as these are "call-used" from C which is 
+   7               	; where this routine is intended to be called from :
+   8               	;
+   9               	; #include <debounce.h>
+  10               	; debounce();
+  11               	;
+  12               	; Timing calculation explanation is at the end of the code
+  13               	;
+  14               	; SPB Jan 2014
+  15               	;
+  17               	.LIST
+  18               	#define _SFR_ASM_COMPAT 1
+  19               	#define __SFR_OFFSET 0 
+  20               	#include <avr/io.h>
+   1               	/* Copyright (c) 2002,2003,2005,2006,2007 Marek Michalkiewicz, Joerg Wunsch
+   2               	   Copyright (c) 2007 Eric B. Weddington
+   3               	   All rights reserved.
+   4               	
+   5               	   Redistribution and use in source and binary forms, with or without
+   6               	   modification, are permitted provided that the following conditions are met:
+   7               	
+   8               	   * Redistributions of source code must retain the above copyright
+   9               	     notice, this list of conditions and the following disclaimer.
+  10               	
+  11               	   * Redistributions in binary form must reproduce the above copyright
+  12               	     notice, this list of conditions and the following disclaimer in
+  13               	     the documentation and/or other materials provided with the
+  14               	     distribution.
+  15               	
+  16               	   * Neither the name of the copyright holders nor the names of
+  17               	     contributors may be used to endorse or promote products derived
+  18               	     from this software without specific prior written permission.
+  19               	
+  20               	  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  21               	  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  22               	  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  23               	  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  24               	  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  25               	  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  26               	  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  27               	  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  28               	  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  29               	  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+  30               	  POSSIBILITY OF SUCH DAMAGE. */
+  31               	
+  32               	/* $Id: io.h 2211 2011-02-14 14:04:25Z aboyapati $ */
+  33               	
+  34               	/** \file */
+  35               	/** \defgroup avr_io <avr/io.h>: AVR device-specific IO definitions
+  36               	    \code #include <avr/io.h> \endcode
+  37               	
+  38               	    This header file includes the apropriate IO definitions for the
+  39               	    device that has been specified by the <tt>-mmcu=</tt> compiler
+  40               	    command-line switch.  This is done by diverting to the appropriate
+  41               	    file <tt>&lt;avr/io</tt><em>XXXX</em><tt>.h&gt;</tt> which should
+  42               	    never be included directly.  Some register names common to all
+  43               	    AVR devices are defined directly within <tt>&lt;avr/common.h&gt;</tt>,
+  44               	    which is included in <tt>&lt;avr/io.h&gt;</tt>,
+  45               	    but most of the details come from the respective include file.
+  46               	
+  47               	    Note that this file always includes the following files:
+  48               	    \code 
+  49               	    #include <avr/sfr_defs.h>
+  50               	    #include <avr/portpins.h>
+  51               	    #include <avr/common.h>
+  52               	    #include <avr/version.h>
+  53               	    \endcode
+  54               	    See \ref avr_sfr for more details about that header file.
+  55               	
+  56               	    Included are definitions of the IO register set and their
+  57               	    respective bit values as specified in the Atmel documentation.
+  58               	    Note that inconsistencies in naming conventions,
+  59               	    so even identical functions sometimes get different names on
+  60               	    different devices.
+  61               	
+  62               	    Also included are the specific names useable for interrupt
+  63               	    function definitions as documented
+  64               	    \ref avr_signames "here".
+  65               	
+  66               	    Finally, the following macros are defined:
+  67               	
+  68               	    - \b RAMEND
+  69               	    <br>
+  70               	    The last on-chip RAM address.
+  71               	    <br>
+  72               	    - \b XRAMEND
+  73               	    <br>
+  74               	    The last possible RAM location that is addressable. This is equal to 
+  75               	    RAMEND for devices that do not allow for external RAM. For devices 
+  76               	    that allow external RAM, this will be larger than RAMEND.
+  77               	    <br>
+  78               	    - \b E2END
+  79               	    <br>
+  80               	    The last EEPROM address.
+  81               	    <br>
+  82               	    - \b FLASHEND
+  83               	    <br>
+  84               	    The last byte address in the Flash program space.
+  85               	    <br>
+  86               	    - \b SPM_PAGESIZE
+  87               	    <br>
+  88               	    For devices with bootloader support, the flash pagesize
+  89               	    (in bytes) to be used for the \c SPM instruction. 
+  90               	    - \b E2PAGESIZE
+  91               	    <br>
+  92               	    The size of the EEPROM page.
+  93               	    
+  94               	*/
+  95               	
+  96               	#ifndef _AVR_IO_H_
+  97               	#define _AVR_IO_H_
+  98               	
+  99               	#include <avr/sfr_defs.h>
+   1               	/* Copyright (c) 2002, Marek Michalkiewicz <marekm@amelek.gda.pl>
+ 100               	
+ 101               	#if defined (__AVR_AT94K__)
+ 102               	#  include <avr/ioat94k.h>
+ 103               	#elif defined (__AVR_AT43USB320__)
+ 104               	#  include <avr/io43u32x.h>
+ 105               	#elif defined (__AVR_AT43USB355__)
+ 106               	#  include <avr/io43u35x.h>
+ 107               	#elif defined (__AVR_AT76C711__)
+ 108               	#  include <avr/io76c711.h>
+ 109               	#elif defined (__AVR_AT86RF401__)
+ 110               	#  include <avr/io86r401.h>
+ 111               	#elif defined (__AVR_AT90PWM1__)
+ 112               	#  include <avr/io90pwm1.h>
+ 113               	#elif defined (__AVR_AT90PWM2__)
+ 114               	#  include <avr/io90pwmx.h>
+ 115               	#elif defined (__AVR_AT90PWM2B__)
+ 116               	#  include <avr/io90pwm2b.h>
+ 117               	#elif defined (__AVR_AT90PWM3__)
+ 118               	#  include <avr/io90pwmx.h>
+ 119               	#elif defined (__AVR_AT90PWM3B__)
+ 120               	#  include <avr/io90pwm3b.h>
+ 121               	#elif defined (__AVR_AT90PWM216__)
+ 122               	#  include <avr/io90pwm216.h>
+ 123               	#elif defined (__AVR_AT90PWM316__)
+ 124               	#  include <avr/io90pwm316.h>
+ 125               	#elif defined (__AVR_AT90PWM81__)
+ 126               	#  include <avr/io90pwm81.h>
+ 127               	#elif defined (__AVR_ATmega8U2__)
+ 128               	#  include <avr/iom8u2.h>
+ 129               	#elif defined (__AVR_ATmega16M1__)
+ 130               	#  include <avr/iom16m1.h>
+ 131               	#elif defined (__AVR_ATmega16U2__)
+ 132               	#  include <avr/iom16u2.h>
+ 133               	#elif defined (__AVR_ATmega16U4__)
+ 134               	#  include <avr/iom16u4.h>
+ 135               	#elif defined (__AVR_ATmega32C1__)
+ 136               	#  include <avr/iom32c1.h>
+ 137               	#elif defined (__AVR_ATmega32M1__)
+ 138               	#  include <avr/iom32m1.h>
+ 139               	#elif defined (__AVR_ATmega32U2__)
+ 140               	#  include <avr/iom32u2.h>
+ 141               	#elif defined (__AVR_ATmega32U4__)
+ 142               	#  include <avr/iom32u4.h>
+ 143               	#elif defined (__AVR_ATmega32U6__)
+ 144               	#  include <avr/iom32u6.h>
+ 145               	#elif defined (__AVR_ATmega64C1__)
+ 146               	#  include <avr/iom64c1.h>
+ 147               	#elif defined (__AVR_ATmega64M1__)
+ 148               	#  include <avr/iom64m1.h>
+ 149               	#elif defined (__AVR_ATmega128__)
+ 150               	#  include <avr/iom128.h>
+ 151               	#elif defined (__AVR_ATmega1280__)
+ 152               	#  include <avr/iom1280.h>
+ 153               	#elif defined (__AVR_ATmega1281__)
+ 154               	#  include <avr/iom1281.h>
+ 155               	#elif defined (__AVR_ATmega1284P__)
+ 156               	#  include <avr/iom1284p.h>
+ 157               	#elif defined (__AVR_ATmega128RFA1__)
+ 158               	#  include <avr/iom128rfa1.h>
+ 159               	#elif defined (__AVR_ATmega2560__)
+ 160               	#  include <avr/iom2560.h>
+ 161               	#elif defined (__AVR_ATmega2561__)
+ 162               	#  include <avr/iom2561.h>
+ 163               	#elif defined (__AVR_AT90CAN32__)
+ 164               	#  include <avr/iocan32.h>
+ 165               	#elif defined (__AVR_AT90CAN64__)
+ 166               	#  include <avr/iocan64.h>
+ 167               	#elif defined (__AVR_AT90CAN128__)
+ 168               	#  include <avr/iocan128.h>
+ 169               	#elif defined (__AVR_AT90USB82__)
+ 170               	#  include <avr/iousb82.h>
+ 171               	#elif defined (__AVR_AT90USB162__)
+ 172               	#  include <avr/iousb162.h>
+ 173               	#elif defined (__AVR_AT90USB646__)
+ 174               	#  include <avr/iousb646.h>
+ 175               	#elif defined (__AVR_AT90USB647__)
+ 176               	#  include <avr/iousb647.h>
+ 177               	#elif defined (__AVR_AT90USB1286__)
+ 178               	#  include <avr/iousb1286.h>
+ 179               	#elif defined (__AVR_AT90USB1287__)
+ 180               	#  include <avr/iousb1287.h>
+ 181               	#elif defined (__AVR_ATmega64__)
+ 182               	#  include <avr/iom64.h>
+ 183               	#elif defined (__AVR_ATmega640__)
+ 184               	#  include <avr/iom640.h>
+ 185               	#elif defined (__AVR_ATmega644__) || defined (__AVR_ATmega644A__)
+ 186               	#  include <avr/iom644.h>
+ 187               	#elif defined (__AVR_ATmega644P__)
+ 188               	#  include <avr/iom644p.h>
+ 189               	#elif defined (__AVR_ATmega644PA__)
+ 190               	#  include <avr/iom644pa.h>
+ 191               	#elif defined (__AVR_ATmega645__) || defined (__AVR_ATmega645A__) || defined (__AVR_ATmega645P__)
+ 192               	#  include <avr/iom645.h>
+ 193               	#elif defined (__AVR_ATmega6450__) || defined (__AVR_ATmega6450A__) || defined (__AVR_ATmega6450P__
+ 194               	#  include <avr/iom6450.h>
+ 195               	#elif defined (__AVR_ATmega649__) || defined (__AVR_ATmega649A__)
+ 196               	#  include <avr/iom649.h>
+ 197               	#elif defined (__AVR_ATmega6490__) || defined (__AVR_ATmega6490A__) || defined (__AVR_ATmega6490P__
+ 198               	#  include <avr/iom6490.h>
+ 199               	#elif defined (__AVR_ATmega649P__)
+ 200               	#  include <avr/iom649p.h>
+ 201               	#elif defined (__AVR_ATmega64HVE__)
+ 202               	#  include <avr/iom64hve.h>
+ 203               	#elif defined (__AVR_ATmega103__)
+ 204               	#  include <avr/iom103.h>
+ 205               	#elif defined (__AVR_ATmega32__)
+ 206               	#  include <avr/iom32.h>
+ 207               	#elif defined (__AVR_ATmega323__)
+ 208               	#  include <avr/iom323.h>
+ 209               	#elif defined (__AVR_ATmega324P__) || defined (__AVR_ATmega324A__)
+ 210               	#  include <avr/iom324.h>
+ 211               	#elif defined (__AVR_ATmega324PA__)
+ 212               	#  include <avr/iom324pa.h>
+ 213               	#elif defined (__AVR_ATmega325__) || defined (__AVR_ATmega325A__)
+ 214               	#  include <avr/iom325.h>
+ 215               	#elif defined (__AVR_ATmega325P__)
+ 216               	#  include <avr/iom325.h>
+ 217               	#elif defined (__AVR_ATmega3250__) || defined (__AVR_ATmega3250A__)
+ 218               	#  include <avr/iom3250.h>
+ 219               	#elif defined (__AVR_ATmega3250P__)
+ 220               	#  include <avr/iom3250.h>
+ 221               	#elif defined (__AVR_ATmega328P__) || defined (__AVR_ATmega328__)
+ 222               	#  include <avr/iom328p.h>
+ 223               	#elif defined (__AVR_ATmega329__) || defined (__AVR_ATmega329A__)
+ 224               	#  include <avr/iom329.h>
+ 225               	#elif defined (__AVR_ATmega329P__) || defined (__AVR_ATmega329PA__)
+ 226               	#  include <avr/iom329.h>
+ 227               	#elif defined (__AVR_ATmega3290__) || defined (__AVR_ATmega3290A__)
+ 228               	#  include <avr/iom3290.h>
+ 229               	#elif defined (__AVR_ATmega3290P__)
+ 230               	#  include <avr/iom3290.h>
+ 231               	#elif defined (__AVR_ATmega32HVB__)
+ 232               	#  include <avr/iom32hvb.h>
+ 233               	#elif defined (__AVR_ATmega32HVBREVB__)
+ 234               	#  include <avr/iom32hvbrevb.h>
+ 235               	#elif defined (__AVR_ATmega406__)
+ 236               	#  include <avr/iom406.h>
+ 237               	#elif defined (__AVR_ATmega16__)
+ 238               	#  include <avr/iom16.h>
+ 239               	#elif defined (__AVR_ATmega16A__)
+ 240               	#  include <avr/iom16a.h>
+ 241               	#elif defined (__AVR_ATmega161__)
+ 242               	#  include <avr/iom161.h>
+ 243               	#elif defined (__AVR_ATmega162__)
+ 244               	#  include <avr/iom162.h>
+ 245               	#elif defined (__AVR_ATmega163__)
+ 246               	#  include <avr/iom163.h>
+ 247               	#elif defined (__AVR_ATmega164P__) || defined (__AVR_ATmega164A__)
+ 248               	#  include <avr/iom164.h>
+ 249               	#elif defined (__AVR_ATmega165__) || defined (__AVR_ATmega165A__)
+ 250               	#  include <avr/iom165.h>
+ 251               	#elif defined (__AVR_ATmega165P__)
+ 252               	#  include <avr/iom165p.h>
+ 253               	#elif defined (__AVR_ATmega168__) || defined (__AVR_ATmega168A__)
+ 254               	#  include <avr/iom168.h>
+ 255               	#elif defined (__AVR_ATmega168P__)
+ 256               	#  include <avr/iom168p.h>
+ 257               	#elif defined (__AVR_ATmega169__) || defined (__AVR_ATmega169A__)
+ 258               	#  include <avr/iom169.h>
+ 259               	#elif defined (__AVR_ATmega169P__)
+ 260               	#  include <avr/iom169p.h>
+ 261               	#elif defined (__AVR_ATmega169PA__)
+ 262               	#  include <avr/iom169pa.h>
+ 263               	#elif defined (__AVR_ATmega8HVA__)
+ 264               	#  include <avr/iom8hva.h>
+ 265               	#elif defined (__AVR_ATmega16HVA__)
+ 266               	#  include <avr/iom16hva.h>
+ 267               	#elif defined (__AVR_ATmega16HVA2__)
+ 268               	#  include <avr/iom16hva2.h>
+ 269               	#elif defined (__AVR_ATmega16HVB__)
+ 270               	#  include <avr/iom16hvb.h>
+ 271               	#elif defined (__AVR_ATmega16HVBREVB__)
+ 272               	#  include <avr/iom16hvbrevb.h>
+ 273               	#elif defined (__AVR_ATmega8__)
+ 274               	#  include <avr/iom8.h>
+ 275               	#elif defined (__AVR_ATmega48__) || defined (__AVR_ATmega48A__)
+ 276               	#  include <avr/iom48.h>
+ 277               	#elif defined (__AVR_ATmega48P__)
+ 278               	#  include <avr/iom48p.h>
+ 279               	#elif defined (__AVR_ATmega88__) || defined (__AVR_ATmega88A__)
+ 280               	#  include <avr/iom88.h>
+ 281               	#elif defined (__AVR_ATmega88P__)
+ 282               	#  include <avr/iom88p.h>
+ 283               	#elif defined (__AVR_ATmega88PA__)
+ 284               	#  include <avr/iom88pa.h>
+ 285               	#elif defined (__AVR_ATmega8515__)
+ 286               	#  include <avr/iom8515.h>
+ 287               	#elif defined (__AVR_ATmega8535__)
+ 288               	#  include <avr/iom8535.h>
+ 289               	#elif defined (__AVR_AT90S8535__)
+ 290               	#  include <avr/io8535.h>
+ 291               	#elif defined (__AVR_AT90C8534__)
+ 292               	#  include <avr/io8534.h>
+ 293               	#elif defined (__AVR_AT90S8515__)
+ 294               	#  include <avr/io8515.h>
+ 295               	#elif defined (__AVR_AT90S4434__)
+ 296               	#  include <avr/io4434.h>
+ 297               	#elif defined (__AVR_AT90S4433__)
+ 298               	#  include <avr/io4433.h>
+ 299               	#elif defined (__AVR_AT90S4414__)
+ 300               	#  include <avr/io4414.h>
+ 301               	#elif defined (__AVR_ATtiny22__)
+ 302               	#  include <avr/iotn22.h>
+ 303               	#elif defined (__AVR_ATtiny26__)
+ 304               	#  include <avr/iotn26.h>
+ 305               	#elif defined (__AVR_AT90S2343__)
+ 306               	#  include <avr/io2343.h>
+ 307               	#elif defined (__AVR_AT90S2333__)
+ 308               	#  include <avr/io2333.h>
+ 309               	#elif defined (__AVR_AT90S2323__)
+ 310               	#  include <avr/io2323.h>
+ 311               	#elif defined (__AVR_AT90S2313__)
+ 312               	#  include <avr/io2313.h>
+ 313               	#elif defined (__AVR_ATtiny4__)
+ 314               	#  include <avr/iotn4.h>
+ 315               	#elif defined (__AVR_ATtiny5__)
+ 316               	#  include <avr/iotn5.h>
+ 317               	#elif defined (__AVR_ATtiny9__)
+ 318               	#  include <avr/iotn9.h>
+ 319               	#elif defined (__AVR_ATtiny10__)
+ 320               	#  include <avr/iotn10.h>
+ 321               	#elif defined (__AVR_ATtiny20__)
+ 322               	#  include <avr/iotn20.h>
+ 323               	#elif defined (__AVR_ATtiny40__)
+ 324               	#  include <avr/iotn40.h>
+ 325               	#elif defined (__AVR_ATtiny2313__)
+ 326               	#  include <avr/iotn2313.h>
+   1               	/* Copyright (c) 2004, 2005, 2006 Bob Paddock
+   2               	   All rights reserved.
+   3               	
+   4               	   Redistribution and use in source and binary forms, with or without
+   5               	   modification, are permitted provided that the following conditions are met:
+   6               	
+   7               	   * Redistributions of source code must retain the above copyright
+   8               	     notice, this list of conditions and the following disclaimer.
+   9               	
+  10               	   * Redistributions in binary form must reproduce the above copyright
+  11               	     notice, this list of conditions and the following disclaimer in
+  12               	     the documentation and/or other materials provided with the
+  13               	     distribution.
+  14               	
+  15               	   * Neither the name of the copyright holders nor the names of
+  16               	     contributors may be used to endorse or promote products derived
+  17               	     from this software without specific prior written permission.
+  18               	
+  19               	  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  20               	  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  21               	  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  22               	  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  23               	  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  24               	  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  25               	  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  26               	  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  27               	  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  28               	  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+  29               	  POSSIBILITY OF SUCH DAMAGE. */
+  30               	
+  31               	/* $Id: iotn2313.h 2236 2011-03-17 21:53:39Z arcanum $ */
+  32               	
+  33               	/* iotn2313.h derived from io2313.h by Bob Paddock.
+  34               	
+  35               	   The changes between the AT90S2313 and the ATtiny2313 are extensive.
+  36               	
+  37               	   Atmel has renamed several registers, and bits.  See Atmel application note
+  38               	   AVR091, as well as the errata at the end of the current ATtiny2313 data
+  39               	   sheet.  Some of the names have changed more than once during the sampling
+  40               	   period of the ATtiny2313.
+  41               	
+  42               	   Where there is no conflict the new and old names are both supported.
+  43               	
+  44               	   In the case of a new feature in a register, only the new name is used.
+  45               	   This intentionally breaks old code, so that there are no silent bugs.  The
+  46               	   source code must be updated to the new name in this case.
+  47               	
+  48               	   The hardware interrupt vector table has changed from that of the AT90S2313.
+  49               	
+  50               	   ATtiny2313 programs in page mode rather than the byte mode of the
+  51               	   AT90S2313.  Beware of programming the ATtiny2313 as a AT90S2313 device,
+  52               	   when programming the Flash.
+  53               	
+  54               	   ATtiny2313 has Signature Bytes: 0x1E 0x91 0x0A.
+  55               	
+  56               	   Changes and/or additions are noted by "ATtiny" in the comments below. */
+  57               	
+  58               	/* avr/iotn2313.h - definitions for ATtiny2313 */
+  59               	
+  60               	#ifndef _AVR_IOTN2313_H_
+  61               	#define _AVR_IOTN2313_H_ 1
+  62               	
+  63               	/* This file should only be included from <avr/io.h>, never directly. */
+  64               	
+  65               	#ifndef _AVR_IO_H_
+  66               	#  error "Include <avr/io.h> instead of this file."
+  67               	#endif
+  68               	
+  69               	#ifndef _AVR_IOXXX_H_
+  70               	#  define _AVR_IOXXX_H_ "iotn2313.h"
+  71               	#else
+  72               	#  error "Attempt to include more than one <avr/ioXXX.h> file."
+  73               	#endif
+  74               	
+  75               	/* I/O registers */
+  76               	
+  77               	/*
+  78               	 *  The Register Bit names are represented by their bit number (0-7).
+  79               	 *  Example: PORTB |= _BV(PORTB7); Set MSB of PORTB.
+  80               	 */
+  81               	
+  82               	/* 0x00 Reserved */
+  83               	
+  84               	/* ATtiny Digital Input Disable Register DIDR */
+  85               	#define DIDR    _SFR_IO8(0x01)
+  86               	
+  87               	#define AIN1D   1
+  88               	#define AIN0D   0
+  89               	
+  90               	/* ATtiny USART Baud Rate Register High UBBRH[11:8] */
+  91               	#define UBRRH   _SFR_IO8(0x02)
+  92               	
+  93               	/* ATtiny USART Control and Status Register C UCSRC */
+  94               	#define UCSRC   _SFR_IO8(0x03)
+  95               	
+  96               	#define UMSEL   6
+  97               	#define UPM1    5
+  98               	#define UPM0    4
+  99               	#define USBS    3
+ 100               	#define UCSZ1   2
+ 101               	#define UCSZ0   1
+ 102               	#define UCPOL   0
+ 103               	
+ 104               	/* 0x04 -> 0x07 Reserved */
+ 105               	
+ 106               	/* ATtiny Analog Comparator Control and Status Register ACSR */
+ 107               	#define ACSR    _SFR_IO8(0x08)
+ 108               	
+ 109               	#define ACD     7
+ 110               	#define ACBG    6
+ 111               	#define ACO     5
+ 112               	#define ACI     4
+ 113               	#define ACIE    3
+ 114               	#define ACIC    2
+ 115               	#define ACIS1   1
+ 116               	#define ACIS0   0
+ 117               	
+ 118               	/* USART Baud Rate Register Low UBBRL[7:0] */
+ 119               	#define UBRRL   _SFR_IO8(0x09)
+ 120               	
+ 121               	/* ATtiny USART Control Register UCSRB */
+ 122               	#define UCSRB   _SFR_IO8(0x0A)
+ 123               	
+ 124               	#define RXCIE   7
+ 125               	#define TXCIE   6
+ 126               	#define UDRIE   5
+ 127               	#define RXEN    4
+ 128               	#define TXEN    3
+ 129               	#define UCSZ2   2
+ 130               	#define RXB8    1
+ 131               	#define TXB8    0
+ 132               	
+ 133               	/* ATtiny USART Status Register UCSRA */
+ 134               	#define UCSRA   _SFR_IO8(0x0B)
+ 135               	
+ 136               	#define RXC     7
+ 137               	#define TXC     6
+ 138               	#define UDRE    5
+ 139               	#define FE      4
+ 140               	#define DOR     3
+ 141               	#define UPE     2
+ 142               	#define U2X     1
+ 143               	#define MPCM    0
+ 144               	
+ 145               	/* USART I/O Data Register UBR or RXB[7:0], TXB[7:0] */
+ 146               	#define UDR     _SFR_IO8(0x0C)
+ 147               	#define RXB     _SFR_IO8(0x0C)
+ 148               	#define TXB     _SFR_IO8(0x0C)
+ 149               	
+ 150               	/* ATtiny USI Control Register USICR */
+ 151               	#define USICR   _SFR_IO8(0x0D)
+ 152               	
+ 153               	#define USISIE  7
+ 154               	#define USIOIE  6
+ 155               	#define USIWM1  5
+ 156               	#define USIWM0  4
+ 157               	#define USICS1  3
+ 158               	#define USICS0  2
+ 159               	#define USICLK  1
+ 160               	#define USITC   0
+ 161               	
+ 162               	/* ATtiny USI Status Register USISR */
+ 163               	#define USISR   _SFR_IO8(0x0E)
+ 164               	
+ 165               	#define USISIF  7
+ 166               	#define USIOIF  6
+ 167               	#define USIPF   5
+ 168               	#define USIDC   4
+ 169               	#define USICNT3 3
+ 170               	#define USICNT2 2
+ 171               	#define USICNT1 1
+ 172               	#define USICNT0 0
+ 173               	
+ 174               	/* ATtiny USI Data Register USIDR[7:0] */
+ 175               	#define USIDR   _SFR_IO8(0x0F)
+ 176               	
+ 177               	/* Input Pins, Port D PIND[6:0] */
+ 178               	#define PIND    _SFR_IO8(0x10)
+ 179               	
+ 180               	#define PIND6   6
+ 181               	#define PIND5   5
+ 182               	#define PIND4   4
+ 183               	#define PIND3   3
+ 184               	#define PIND2   2
+ 185               	#define PIND1   1
+ 186               	#define PIND0   0
+ 187               	
+ 188               	/* Data Direction Register, Port D DDRD[6:0] */
+ 189               	#define DDRD    _SFR_IO8(0x11)
+ 190               	
+ 191               	#define DDD6    6
+ 192               	#define DDD5    5
+ 193               	#define DDD4    4
+ 194               	#define DDD3    3
+ 195               	#define DDD2    2
+ 196               	#define DDD1    1
+ 197               	#define DDD0    0
+ 198               	
+ 199               	/* Data Register, Port D PORTD[6:0] */
+ 200               	#define PORTD   _SFR_IO8(0x12)
+ 201               	
+ 202               	#define PD6     6
+ 203               	#define PD5     5
+ 204               	#define PD4     4
+ 205               	#define PD3     3
+ 206               	#define PD2     2
+ 207               	#define PD1     1
+ 208               	#define PD0     0
+ 209               	
+ 210               	/* ATtiny General Purpose I/O Register Zero GPIOR0[7:0] */
+ 211               	#define GPIOR0  _SFR_IO8(0x13)
+ 212               	
+ 213               	/* ATtiny General Purpose I/O Register One GPIOR1[7:0] */
+ 214               	#define GPIOR1  _SFR_IO8(0x14)
+ 215               	
+ 216               	/* ATtiny General Purpose I/O Register Two One GPIOR2[7:0] */
+ 217               	#define GPIOR2  _SFR_IO8(0x15)
+ 218               	
+ 219               	/* Input Pins, Port B PORTB[7:0] */
+ 220               	#define PINB    _SFR_IO8(0x16)
+ 221               	
+ 222               	#define PINB7   7
+ 223               	#define PINB6   6
+ 224               	#define PINB5   5
+ 225               	#define PINB4   4
+ 226               	#define PINB3   3
+ 227               	#define PINB2   2
+ 228               	#define PINB1   1
+ 229               	#define PINB0   0
+ 230               	
+ 231               	/* Data Direction Register, Port B PORTB[7:0] */
+ 232               	#define DDRB    _SFR_IO8(0x17)
+ 233               	
+ 234               	#define DDB7    7
+ 235               	#define DDB6    6
+ 236               	#define DDB5    5
+ 237               	#define DDB4    4
+ 238               	#define DDB3    3
+ 239               	#define DDB2    2
+ 240               	#define DDB1    1
+ 241               	#define DDB0    0
+ 242               	
+ 243               	/* Data Register, Port B PORTB[7:0] */
+ 244               	#define PORTB   _SFR_IO8(0x18)
+ 245               	
+ 246               	#define PB7     7
+ 247               	#define PB6     6
+ 248               	#define PB5     5
+ 249               	#define PB4     4
+ 250               	#define PB3     3
+ 251               	#define PB2     2
+ 252               	#define PB1     1
+ 253               	#define PB0     0
+ 254               	
+ 255               	/* Port A Input Pins Address PINA[2:0] */
+ 256               	#define PINA    _SFR_IO8(0x19)
+ 257               	
+ 258               	#define PINA2   2
+ 259               	#define PINA1   1
+ 260               	#define PINA0   0
+ 261               	
+ 262               	/* Port A Data Direction Register DDRA[2:0] */
+ 263               	#define DDRA    _SFR_IO8(0x1A)
+ 264               	
+ 265               	#define DDRA2   2
+ 266               	#define DDRA1   1
+ 267               	#define DDRA0   0
+ 268               	
+ 269               	/* Port A Data Register PORTA[2:0] */
+ 270               	#define PORTA   _SFR_IO8(0x1B)
+ 271               	
+ 272               	#define PA2     2
+ 273               	#define PA1     1
+ 274               	#define PA0     0
+ 275               	
+ 276               	/* ATtiny EEPROM Control Register EECR */
+ 277               	#define EECR	_SFR_IO8(0x1C)
+ 278               	#define EEPM1   5
+ 279               	#define EEPM0   4
+ 280               	#define EERIE   3
+ 281               	#define EEMPE   2
+ 282               	#define EEPE    1
+ 283               	#define EERE    0
+ 284               	
+ 285               	/* EEPROM Data Register */
+ 286               	#define EEDR	_SFR_IO8(0x1D)
+ 287               	
+ 288               	/* The EEPROM Address Register EEAR[6:0] */
+ 289               	#define EEAR	_SFR_IO8(0x1E)
+ 290               	#define EEARL	_SFR_IO8(0x1E)
+ 291               	#define EEAR6   6
+ 292               	#define EEAR5   5
+ 293               	#define EEAR4   4
+ 294               	#define EEAR3   3
+ 295               	#define EEAR2   2
+ 296               	#define EEAR1   1
+ 297               	#define EEAR0   0
+ 298               	
+ 299               	/* 0x1F Reserved */
+ 300               	
+ 301               	/* ATtiny Pin Change Mask Register PCMSK PCINT[7:0] */
+ 302               	#define PCMSK   _SFR_IO8(0x20)
+ 303               	
+ 304               	#define PCINT7  7
+ 305               	#define PCINT6  6
+ 306               	#define PCINT5  5
+ 307               	#define PCINT4  4
+ 308               	#define PCINT3  3
+ 309               	#define PCINT2  2
+ 310               	#define PCINT1  1
+ 311               	#define PCINT0  0
+ 312               	
+ 313               	/* ATtiny Watchdog Timer Control Register WDTCSR */
+ 314               	#define WDTCSR  _SFR_IO8(0x21)
+ 315               	
+ 316               	#define WDIF    7
+ 317               	#define WDIE    6
+ 318               	#define WDP3    5
+ 319               	#define WDCE    4
+ 320               	#define WDE     3
+ 321               	#define WDP2    2
+ 322               	#define WDP1    1
+ 323               	#define WDP0    0
+ 324               	
+ 325               	/* ATtiny Timer/Counter1 Control Register C TCCR1C */
+ 326               	#define TCCR1C  _SFR_IO8(0x22)
+ 327               	
+ 328               	#define FOC1A   7
+ 329               	#define FOC1B   6
+ 330               	
+ 331               	/* General Timer/Counter Control Register GTCCR */
+ 332               	#define GTCCR   _SFR_IO8(0x23)
+ 333               	
+ 334               	#define PSR10   0
+ 335               	
+ 336               	/* T/C 1 Input Capture Register ICR1[15:0] */
+ 337               	#define ICR1    _SFR_IO16(0x24)
+ 338               	#define ICR1L   _SFR_IO8(0x24)
+ 339               	#define ICR1H   _SFR_IO8(0x25)
+ 340               	
+ 341               	/* ATtiny Clock Prescale Register */
+ 342               	#define CLKPR   _SFR_IO8(0x26)
+ 343               	
+ 344               	#define CLKPCE  7
+ 345               	#define CLKPS3  3
+ 346               	#define CLKPS2  2
+ 347               	#define CLKPS1  1
+ 348               	#define CLKPS0  0
+ 349               	
+ 350               	/* 0x27 Reserved */
+ 351               	
+ 352               	/* ATtiny Output Compare Register 1 B OCR1B[15:0] */
+ 353               	#define OCR1B   _SFR_IO16(0x28)
+ 354               	#define OCR1BL  _SFR_IO8(0x28)
+ 355               	#define OCR1BH  _SFR_IO8(0x29)
+ 356               	
+ 357               	/* Output Compare Register 1 OCR1A[15:0] */
+ 358               	#define OCR1    _SFR_IO16(0x2A)
+ 359               	#define OCR1L   _SFR_IO8(0x2A)
+ 360               	#define OCR1H   _SFR_IO8(0x2B)
+ 361               	#define OCR1A   _SFR_IO16(0x2A)
+ 362               	#define OCR1AL  _SFR_IO8(0x2A)
+ 363               	#define OCR1AH  _SFR_IO8(0x2B)
+ 364               	
+ 365               	/* Timer/Counter 1 TCNT1[15:0] */
+ 366               	#define TCNT1   _SFR_IO16(0x2C)
+ 367               	#define TCNT1L  _SFR_IO8(0x2C)
+ 368               	#define TCNT1H  _SFR_IO8(0x2D)
+ 369               	
+ 370               	/* ATtiny Timer/Counter 1 Control and Status Register TCCR1B */
+ 371               	#define TCCR1B  _SFR_IO8(0x2E)
+ 372               	
+ 373               	#define ICNC1   7
+ 374               	#define ICES1   6
+ 375               	#define WGM13   4
+ 376               	#define WGM12   3 /* Was CTC1 in AT90S2313 */
+ 377               	#define CS12    2
+ 378               	#define CS11    1
+ 379               	#define CS10    0
+ 380               	
+ 381               	/* ATtiny Timer/Counter 1 Control Register TCCR1A */
+ 382               	#define TCCR1A  _SFR_IO8(0x2F)
+ 383               	
+ 384               	#define COM1A1  7
+ 385               	#define COM1A0  6
+ 386               	#define COM1B1  5
+ 387               	#define COM1B0  4
+ 388               	#define WGM11   1 /* Was PWM11 in AT90S2313 */
+ 389               	#define WGM10   0 /* Was PWM10 in AT90S2313 */
+ 390               	
+ 391               	/* ATtiny Timer/Counter Control Register A TCCR0A */
+ 392               	#define TCCR0A  _SFR_IO8(0x30)
+ 393               	
+ 394               	#define COM0A1  7
+ 395               	#define COM0A0  6
+ 396               	#define COM0B1  5
+ 397               	#define COM0B0  4
+ 398               	#define WGM01   1
+ 399               	#define WGM00   0
+ 400               	
+ 401               	/* ATtiny Oscillator Calibration Register OSCCAL[6:0] */
+ 402               	#define OSCCAL  _SFR_IO8(0x31)
+ 403               	
+ 404               	#define CAL6    6
+ 405               	#define CAL5    5
+ 406               	#define CAL4    4
+ 407               	#define CAL3    3
+ 408               	#define CAL2    2
+ 409               	#define CAL1    1
+ 410               	#define CAL0    0
+ 411               	
+ 412               	/* Timer/Counter 0 TCNT0[7:0] */
+ 413               	#define TCNT0   _SFR_IO8(0x32)
+ 414               	
+ 415               	/* ATtiny Timer/Counter 0 Control Register TCCR0B */
+ 416               	#define TCCR0B  _SFR_IO8(0x33)
+ 417               	
+ 418               	#define FOC0A   7
+ 419               	#define FOC0B   6
+ 420               	#define WGM02   3
+ 421               	#define CS02    2
+ 422               	#define CS01    1
+ 423               	#define CS00    0
+ 424               	
+ 425               	/* ATtiny MCU Status Register MCUSR */
+ 426               	#define MCUSR   _SFR_IO8(0x34)
+ 427               	
+ 428               	#define WDRF    3
+ 429               	#define BORF    2
+ 430               	#define EXTRF   1
+ 431               	#define PORF    0
+ 432               	
+ 433               	/* ATtiny MCU general Control Register MCUCR */
+ 434               	#define MCUCR   _SFR_IO8(0x35)
+ 435               	
+ 436               	#define PUD     7
+ 437               	#define SM1     6
+ 438               	#define SE      5
+ 439               	#define SM0     4 /* Some preliminary ATtiny2313 data sheets incorrectly refer
+ 440               	                     to this bit as SMD; was SM in AT90S2313. */
+ 441               	#define ISC11   3
+ 442               	#define ISC10   2
+ 443               	#define ISC01   1
+ 444               	#define ISC00   0
+ 445               	
+ 446               	/* ATtiny Output Compare Register A OCR0A[7:0] */
+ 447               	#define OCR0A   _SFR_IO8(0x36)
+ 448               	
+ 449               	/* ATtiny Store Program Memory Control and Status Register SPMCSR */
+ 450               	#define SPMCSR  _SFR_IO8(0x37)
+ 451               	
+ 452               	#define CTPB    4
+ 453               	#define RFLB    3
+ 454               	#define PGWRT   2
+ 455               	#define PGERS   1
+ 456               	#define SPMEN   0   /* The name is used in ATtiny2313.xml file. */
+ 457               	#define SELFPRGEN 0 /* The name is used in datasheet. */
+ 458               	#define SELFPRGE  0 /* The name is left for compatibility. */
+ 459               	
+ 460               	/* ATtiny Timer/Counter Interrupt Flag register TIFR */
+ 461               	#define TIFR    _SFR_IO8(0x38)
+ 462               	
+ 463               	#define TOV1    7
+ 464               	#define OCF1A   6
+ 465               	#define OCF1B   5
+ 466               	#define ICF1    3
+ 467               	#define OCF0B   2
+ 468               	#define TOV0    1
+ 469               	#define OCF0A   0
+ 470               	
+ 471               	/* ATtiny Timer/Counter Interrupt MaSK register TIMSK */
+ 472               	#define TIMSK   _SFR_IO8(0x39)
+ 473               	
+ 474               	#define TOIE1   7
+ 475               	#define OCIE1A  6
+ 476               	#define OCIE1B  5
+ 477               	#define ICIE1   3
+ 478               	#define OCIE0B  2
+ 479               	#define TOIE0   1
+ 480               	#define OCIE0A  0
+ 481               	
+ 482               	/* ATtiny External Interrupt Flag Register EIFR, was GIFR */
+ 483               	#define EIFR    _SFR_IO8(0x3A)
+ 484               	
+ 485               	#define INTF1   7
+ 486               	#define INTF0   6
+ 487               	#define PCIF    5
+ 488               	
+ 489               	/* ATtiny General Interrupt MaSK register GIMSK */
+ 490               	#define GIMSK   _SFR_IO8(0x3B)
+ 491               	
+ 492               	#define INT1    7
+ 493               	#define INT0    6
+ 494               	#define PCIE    5
+ 495               	
+ 496               	/* ATtiny Output Compare Register B OCR0B[7:0] */
+ 497               	#define OCR0B   _SFR_IO8(0x3C)
+ 498               	
+ 499               	/* Interrupt vectors: */
+ 500               	
+ 501               	/* External Interrupt Request 0 */
+ 502               	#define INT0_vect_num			1
+ 503               	#define INT0_vect			    _VECTOR(1)
+ 504               	#define SIG_INTERRUPT0			_VECTOR(1)
+ 505               	#define SIG_INT0			    _VECTOR(1)
+ 506               	
+ 507               	/* External Interrupt Request 1 */
+ 508               	#define INT1_vect_num			2
+ 509               	#define INT1_vect	    		_VECTOR(2)
+ 510               	#define SIG_INTERRUPT1			_VECTOR(2)
+ 511               	#define SIG_INT1		    	_VECTOR(2)
+ 512               	
+ 513               	/* Timer/Counter1 Capture Event */
+ 514               	#define TIMER1_CAPT_vect_num	3
+ 515               	#define TIMER1_CAPT_vect		_VECTOR(3)
+ 516               	#define SIG_INPUT_CAPTURE1		_VECTOR(3)
+ 517               	#define SIG_TIMER1_CAPT			_VECTOR(3)
+ 518               	
+ 519               	/* Timer/Counter1 Compare Match A */
+ 520               	#define TIMER1_COMPA_vect_num	4
+ 521               	#define TIMER1_COMPA_vect		_VECTOR(4)
+ 522               	#define SIG_OUTPUT_COMPARE1A	_VECTOR(4)
+ 523               	#define SIG_TIMER1_COMPA		_VECTOR(4)
+ 524               	
+ 525               	/* Timer/Counter1 Overflow */
+ 526               	#define TIMER1_OVF_vect_num  	5
+ 527               	#define TIMER1_OVF_vect			_VECTOR(5)
+ 528               	#define SIG_OVERFLOW1			_VECTOR(5)
+ 529               	#define SIG_TIMER1_OVF			_VECTOR(5)
+ 530               	
+ 531               	/* Timer/Counter0 Overflow */
+ 532               	#define TIMER0_OVF_vect_num 	6
+ 533               	#define TIMER0_OVF_vect			_VECTOR(6)
+ 534               	#define SIG_OVERFLOW0			_VECTOR(6)
+ 535               	#define SIG_TIMER0_OVF			_VECTOR(6)
+ 536               	
+ 537               	/* USART, Rx Complete */
+ 538               	#define USART_RX_vect_num		7
+ 539               	#define USART_RX_vect			_VECTOR(7)
+ 540               	#define SIG_USART0_RECV			_VECTOR(7)
+ 541               	#define SIG_USART0_RX			_VECTOR(7)
+ 542               	
+ 543               	/* USART Data Register Empty */
+ 544               	#define USART_UDRE_vect_num		8
+ 545               	#define USART_UDRE_vect			_VECTOR(8)
+ 546               	#define SIG_USART0_DATA			_VECTOR(8)
+ 547               	#define SIG_USART0_UDRE			_VECTOR(8)
+ 548               	
+ 549               	/* USART, Tx Complete */
+ 550               	#define USART_TX_vect_num   	9
+ 551               	#define USART_TX_vect			_VECTOR(9)
+ 552               	#define SIG_USART0_TRANS		_VECTOR(9)
+ 553               	#define SIG_USART0_TX			_VECTOR(9)
+ 554               	
+ 555               	/* Analog Comparator */
+ 556               	#define ANA_COMP_vect_num		10
+ 557               	#define ANA_COMP_vect			_VECTOR(10)
+ 558               	#define SIG_COMPARATOR			_VECTOR(10)
+ 559               	#define SIG_ANALOG_COMP			_VECTOR(10)
+ 560               	
+ 561               	#define PCINT_vect_num			11
+ 562               	#define PCINT_vect		    	_VECTOR(11)
+ 563               	#define SIG_PIN_CHANGE			_VECTOR(11)
+ 564               	#define SIG_PCINT			    _VECTOR(11)
+ 565               	
+ 566               	#define TIMER1_COMPB_vect_num	12
+ 567               	#define TIMER1_COMPB_vect		_VECTOR(12)
+ 568               	#define SIG_OUTPUT_COMPARE1B	_VECTOR(12)
+ 569               	#define SIG_TIMER1_COMPB		_VECTOR(12)
+ 570               	
+ 571               	#define TIMER0_COMPA_vect_num	13
+ 572               	#define TIMER0_COMPA_vect		_VECTOR(13)
+ 573               	#define SIG_OUTPUT_COMPARE0A	_VECTOR(13)
+ 574               	#define SIG_TIMER0_COMPA		_VECTOR(13)
+ 575               	
+ 576               	#define TIMER0_COMPB_vect_num	14
+ 577               	#define TIMER0_COMPB_vect		_VECTOR(14)
+ 578               	#define SIG_OUTPUT_COMPARE0B	_VECTOR(14)
+ 579               	#define SIG_TIMER0_COMPB		_VECTOR(14)
+ 580               	
+ 581               	/* USI Start Condition */
+ 582               	#define USI_START_vect_num		15
+ 583               	#define USI_START_vect			_VECTOR(15)
+ 584               	#define SIG_USI_START			_VECTOR(15)
+ 585               	
+ 586               	/* USI Overflow */
+ 587               	#define USI_OVERFLOW_vect_num	16
+ 588               	#define USI_OVERFLOW_vect		_VECTOR(16)
+ 589               	#define SIG_USI_OVERFLOW		_VECTOR(16)
+ 590               	
+ 591               	#define EEPROM_READY_vect_num	17
+ 592               	#define EEPROM_READY_vect		_VECTOR(17)
+ 593               	#define SIG_EEPROM_READY		_VECTOR(17)
+ 594               	#define SIG_EE_READY			_VECTOR(17)
+ 595               	
+ 596               	/* Watchdog Timer Overflow */
+ 597               	#define WDT_OVERFLOW_vect_num	18
+ 598               	#define WDT_OVERFLOW_vect		_VECTOR(18)
+ 599               	#define SIG_WATCHDOG_TIMEOUT	_VECTOR(18)
+ 600               	#define SIG_WDT_OVERFLOW		_VECTOR(18)
+ 601               	
+ 602               	/* 38 = (18*2)+2: Number of vectors times two, plus the reset vector */
+ 603               	#define _VECTORS_SIZE     38
+ 604               	
+ 605               	/* Constants */
+ 606               	#define SPM_PAGESIZE 32
+ 607               	#define RAMSTART     (0x60)
+ 608               	#define RAMEND       0xDF
+ 609               	#define XRAMEND      RAMEND
+ 610               	#define E2END        0x7F
+ 611               	#define E2PAGESIZE   4
+ 612               	#define FLASHEND     0x07FF
+ 613               	
+ 614               	
+ 615               	/* Fuses */
+ 616               	#define FUSE_MEMORY_SIZE 3
+ 617               	
+ 618               	/* Low Fuse Byte */
+ 619               	#define FUSE_CKSEL0      (unsigned char)~_BV(0)
+ 620               	#define FUSE_CKSEL1      (unsigned char)~_BV(1)
+ 621               	#define FUSE_CKSEL2      (unsigned char)~_BV(2)
+ 622               	#define FUSE_CKSEL3      (unsigned char)~_BV(3)
+ 623               	#define FUSE_SUT0        (unsigned char)~_BV(4)
+ 624               	#define FUSE_SUT1        (unsigned char)~_BV(5)
+ 625               	#define FUSE_CKOUT       (unsigned char)~_BV(6)
+ 626               	#define FUSE_CKDIV8      (unsigned char)~_BV(7)
+ 627               	#define LFUSE_DEFAULT (FUSE_CKSEL0 & FUSE_CKSEL1 & FUSE_CKSEL3 & FUSE_SUT0 & FUSE_CKDIV8)
+ 628               	
+ 629               	/* High Fuse Byte */
+ 630               	#define FUSE_RSTDISBL    (unsigned char)~_BV(0)
+ 631               	#define FUSE_BODLEVEL0   (unsigned char)~_BV(1)
+ 632               	#define FUSE_BODLEVEL1   (unsigned char)~_BV(2)
+ 633               	#define FUSE_BODLEVEL2   (unsigned char)~_BV(3)
+ 634               	#define FUSE_WDTON       (unsigned char)~_BV(4)
+ 635               	#define FUSE_SPIEN       (unsigned char)~_BV(5)
+ 636               	#define FUSE_EESAVE      (unsigned char)~_BV(6)
+ 637               	#define FUSE_DWEN        (unsigned char)~_BV(7)
+ 638               	#define HFUSE_DEFAULT (FUSE_SPIEN)
+ 639               	
+ 640               	/* Extended Fuse Byte */
+ 641               	#define FUSE_SELFPRGEN   (unsigned char)~_BV(0)
+ 642               	#define EFUSE_DEFAULT (0xFF)
+ 643               	
+ 644               	
+ 645               	/* Lock Bits */
+ 646               	#define __LOCK_BITS_EXIST
+ 647               	
+ 648               	
+ 649               	/* Signature */
+ 650               	#define SIGNATURE_0 0x1E
+ 651               	#define SIGNATURE_1 0x91
+ 652               	#define SIGNATURE_2 0x0A
+ 653               	
+ 654               	
+ 655               	/* Deprecated items */
+ 656               	#if !defined(__AVR_LIBC_DEPRECATED_ENABLE__)
+ 657               	
+ 658               	#pragma GCC system_header
+ 659               	
+ 660               	#pragma GCC poison SIG_INTERRUPT0
+ 661               	#pragma GCC poison SIG_INT0
+ 662               	#pragma GCC poison SIG_INTERRUPT1
+ 663               	#pragma GCC poison SIG_INT1
+ 664               	#pragma GCC poison SIG_INPUT_CAPTURE1
+ 665               	#pragma GCC poison SIG_TIMER1_CAPT
+ 666               	#pragma GCC poison SIG_OUTPUT_COMPARE1A
+ 667               	#pragma GCC poison SIG_TIMER1_COMPA
+ 668               	#pragma GCC poison SIG_OVERFLOW1
+ 669               	#pragma GCC poison SIG_TIMER1_OVF
+ 670               	#pragma GCC poison SIG_OVERFLOW0
+ 671               	#pragma GCC poison SIG_TIMER0_OVF
+ 672               	#pragma GCC poison SIG_USART0_RECV
+ 673               	#pragma GCC poison SIG_USART0_RX
+ 674               	#pragma GCC poison SIG_USART0_DATA
+ 675               	#pragma GCC poison SIG_USART0_UDRE
+ 676               	#pragma GCC poison SIG_USART0_TRANS
+ 677               	#pragma GCC poison SIG_USART0_TX
+ 678               	#pragma GCC poison SIG_COMPARATOR
+ 679               	#pragma GCC poison SIG_ANALOG_COMP
+ 680               	#pragma GCC poison SIG_PIN_CHANGE
+ 681               	#pragma GCC poison SIG_PCINT
+ 682               	#pragma GCC poison SIG_OUTPUT_COMPARE1B
+ 683               	#pragma GCC poison SIG_TIMER1_COMPB
+ 684               	#pragma GCC poison SIG_OUTPUT_COMPARE0A
+ 685               	#pragma GCC poison SIG_TIMER0_COMPA
+ 686               	#pragma GCC poison SIG_OUTPUT_COMPARE0B
+ 687               	#pragma GCC poison SIG_TIMER0_COMPB
+ 688               	#pragma GCC poison SIG_USI_START
+ 689               	#pragma GCC poison SIG_USI_OVERFLOW
+ 690               	#pragma GCC poison SIG_EEPROM_READY
+ 691               	#pragma GCC poison SIG_EE_READY
+ 692               	#pragma GCC poison SIG_WATCHDOG_TIMEOUT
+ 693               	#pragma GCC poison SIG_WDT_OVERFLOW
+ 694               	
+ 327               	#elif defined (__AVR_ATtiny2313A__)
+ 328               	#  include <avr/iotn2313a.h>
+ 329               	#elif defined (__AVR_ATtiny13__)
+ 330               	#  include <avr/iotn13.h>
+ 331               	#elif defined (__AVR_ATtiny13A__)
+ 332               	#  include <avr/iotn13a.h>
+ 333               	#elif defined (__AVR_ATtiny25__)
+ 334               	#  include <avr/iotn25.h>
+ 335               	#elif defined (__AVR_ATtiny4313__)
+ 336               	#  include <avr/iotn4313.h>
+ 337               	#elif defined (__AVR_ATtiny45__)
+ 338               	#  include <avr/iotn45.h>
+ 339               	#elif defined (__AVR_ATtiny85__)
+ 340               	#  include <avr/iotn85.h>
+ 341               	#elif defined (__AVR_ATtiny24__)
+ 342               	#  include <avr/iotn24.h>
+ 343               	#elif defined (__AVR_ATtiny24A__)
+ 344               	#  include <avr/iotn24a.h>
+ 345               	#elif defined (__AVR_ATtiny44__)
+ 346               	#  include <avr/iotn44.h>
+ 347               	#elif defined (__AVR_ATtiny44A__)
+ 348               	#  include <avr/iotn44a.h>
+ 349               	#elif defined (__AVR_ATtiny84__)
+ 350               	#  include <avr/iotn84.h>
+ 351               	#elif defined (__AVR_ATtiny84A__)
+ 352               	#  include <avr/iotn84a.h>  
+ 353               	#elif defined (__AVR_ATtiny261__)
+ 354               	#  include <avr/iotn261.h>
+ 355               	#elif defined (__AVR_ATtiny261A__)
+ 356               	#  include <avr/iotn261a.h>
+ 357               	#elif defined (__AVR_ATtiny461__)
+ 358               	#  include <avr/iotn461.h>
+ 359               	#elif defined (__AVR_ATtiny461A__)
+ 360               	#  include <avr/iotn461a.h>
+ 361               	#elif defined (__AVR_ATtiny861__)
+ 362               	#  include <avr/iotn861.h>
+ 363               	#elif defined (__AVR_ATtiny861A__)
+ 364               	#  include <avr/iotn861a.h>
+ 365               	#elif defined (__AVR_ATtiny43U__)
+ 366               	#  include <avr/iotn43u.h>
+ 367               	#elif defined (__AVR_ATtiny48__)
+ 368               	#  include <avr/iotn48.h>
+ 369               	#elif defined (__AVR_ATtiny88__)
+ 370               	#  include <avr/iotn88.h>
+ 371               	#elif defined (__AVR_ATtiny87__)
+ 372               	#  include <avr/iotn87.h>
+ 373               	#elif defined (__AVR_ATtiny167__)
+ 374               	#  include <avr/iotn167.h>
+ 375               	#elif defined (__AVR_AT90SCR100__)
+ 376               	#  include <avr/io90scr100.h>
+ 377               	#elif defined (__AVR_ATxmega16A4__)
+ 378               	#  include <avr/iox16a4.h>
+ 379               	#elif defined (__AVR_ATxmega16D4__)
+ 380               	#  include <avr/iox16d4.h>
+ 381               	#elif defined (__AVR_ATxmega32A4__)
+ 382               	#  include <avr/iox32a4.h>
+ 383               	#elif defined (__AVR_ATxmega32D4__)
+ 384               	#  include <avr/iox32d4.h>
+ 385               	#elif defined (__AVR_ATxmega64A1__)
+ 386               	#  include <avr/iox64a1.h>
+ 387               	#elif defined (__AVR_ATxmega64A1U__)
+ 388               	#  include <avr/iox64a1u.h>
+ 389               	#elif defined (__AVR_ATxmega64A3__)
+ 390               	#  include <avr/iox64a3.h>
+ 391               	#elif defined (__AVR_ATxmega64D3__)
+ 392               	#  include <avr/iox64d3.h>
+ 393               	#elif defined (__AVR_ATxmega128A1__)
+ 394               	#  include <avr/iox128a1.h>
+ 395               	#elif defined (__AVR_ATxmega128A1U__)
+ 396               	#  include <avr/iox128a1u.h>
+ 397               	#elif defined (__AVR_ATxmega128A3__)
+ 398               	#  include <avr/iox128a3.h>
+ 399               	#elif defined (__AVR_ATxmega128D3__)
+ 400               	#  include <avr/iox128d3.h>
+ 401               	#elif defined (__AVR_ATxmega192A3__)
+ 402               	#  include <avr/iox192a3.h>
+ 403               	#elif defined (__AVR_ATxmega192D3__)
+ 404               	#  include <avr/iox192d3.h>
+ 405               	#elif defined (__AVR_ATxmega256A3__)
+ 406               	#  include <avr/iox256a3.h>
+ 407               	#elif defined (__AVR_ATxmega256A3B__)
+ 408               	#  include <avr/iox256a3b.h>
+ 409               	#elif defined (__AVR_ATxmega256D3__)
+ 410               	#  include <avr/iox256d3.h>
+ 411               	#elif defined (__AVR_ATA6289__)
+ 412               	#  include <avr/ioa6289.h>
+ 413               	/* avr1: the following only supported for assembler programs */
+ 414               	#elif defined (__AVR_ATtiny28__)
+ 415               	#  include <avr/iotn28.h>
+ 416               	#elif defined (__AVR_AT90S1200__)
+ 417               	#  include <avr/io1200.h>
+ 418               	#elif defined (__AVR_ATtiny15__)
+ 419               	#  include <avr/iotn15.h>
+ 420               	#elif defined (__AVR_ATtiny12__)
+ 421               	#  include <avr/iotn12.h>
+ 422               	#elif defined (__AVR_ATtiny11__)
+ 423               	#  include <avr/iotn11.h>
+ 424               	#elif defined (__AVR_M3000__)
+ 425               	#  include <avr/iom3000.h>
+ 426               	#else
+ 427               	#  if !defined(__COMPILING_AVR_LIBC__)
+ 428               	#    warning "device type not defined"
+ 429               	#  endif
+ 430               	#endif
+ 431               	
+ 432               	#include <avr/portpins.h>
+   1               	/* Copyright (c) 2003  Theodore A. Roth
+ 433               	
+ 434               	#include <avr/common.h>
+   1               	/* Copyright (c) 2007 Eric B. Weddington
+ 435               	
+ 436               	#include <avr/version.h>
+   1               	/* Copyright (c) 2005, Joerg Wunsch                               -*- c -*-
+ 437               	
+ 438               	/* Include fuse.h after individual IO header files. */
+ 439               	#include <avr/fuse.h>
+   1               	/* Copyright (c) 2007, Atmel Corporation
+ 440               	
+ 441               	/* Include lock.h after individual IO header files. */
+ 442               	#include <avr/lock.h>
+   1               	/* Copyright (c) 2007, Atmel Corporation
+ 443               	
+  21               	.global debounce
+  22               	.section .text                  		; Defines a code section	
+  23               	debounce:
+  24 0000 2FEA      		ldi	r18,175							; 1 Load R18 outer loop counter
+  25               	outerloop:
+  26               	;-> Outer
+  27 0002 32E8      		ldi r19,130							; 1 load R19 inner loop counter
+  28               	innerloop:
+  29               	;-----> Inner
+  30 0004 0000      			nop									; 1 Timing alignment
+  31 0006 0000      			nop									; 1 Timing alignment
+  32 0008 0000      			nop									; 1 Timing alignment
+  33               	;
+  34 000a 3150      			subi	r19,1						; 1 Decrement inner counter
+  35 000c 3030      			cpi		r19,0						; 1 Compare to zero
+  36 000e 01F4      			brne	innerloop					; 1 F, 2 T Branch if not equal
+  37               	;-----> Inner 
+  38 0010 2150      		subi	r18,1						; 1 Decrement outer counter
+  39 0012 2030      		cpi		r18,0						; 1 Compare to zero
+  40 0014 01F4      		brne	outerloop					; 1 F, 2 T Branch if not equal
+  41               	;-> Outer
+  42               	;Adjust {
+  43 0016 4CE0      		ldi 	r20,12						; 1 Load adjust counter
+  44 0018 0000      		nop									; 1 Alignment
+  45               	adjust:
+  46 001a 4150      		subi	r20,1						; 1 Decrement
+  47 001c 4030      		cpi		r20,0						; 1 Compare to zero
+  48 001e 01F4      		brne	adjust						; 1 F, 2 T
+  49               	;} 
+  50 0020 0895      		ret									; 1 Return
+  51               	;
+  52               	; Timing explanation
+  53               	;
+  54               	; The inner loop size is 7 cyles for (counter - 1) loops and 6 cycles on the last loop  
+  55               	; (129 x 7) + 6 = 909 cycles
+  56               	; 
+  57               	; The outer loop size is 5 + inner loop for (counter - 1) loops and 4 + inner loop on the last loop
+  58               	; ((5 + 909) x 174) + (4 + 909) = 159,949
+  59               	;
+  60               	; Initial ldi and ret = 2
+  61               	; Adjust routine is 1 + 1 + (12 x 4) + 3 = 49
+  62               	;
+  63               	; Total cycles = 160,000
+  64               	;
+  65               	; Each cycle is 0.125 micro secs so total time = 20,000 micro seconds or 20 milli seconds
+  66               	;
+DEFINED SYMBOLS
+          debounce.S:23     .text:0000000000000000 debounce
+          debounce.S:25     .text:0000000000000002 outerloop
+          debounce.S:28     .text:0000000000000004 innerloop
+          debounce.S:45     .text:000000000000001a adjust
+
+NO UNDEFINED SYMBOLS
