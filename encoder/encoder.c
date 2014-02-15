@@ -102,6 +102,8 @@ ISR(INT0_vect)
 {
 	buttonPress=1;
 	debounce();
+//	debounce();
+//	debounce();
 }	
 
 
