@@ -12,11 +12,11 @@
 #include <avr/interrupt.h>
 #include <debounce.h>
 
-#define CW	PB0
-#define ACW PB1
-#define PMW PB3
-#define DBG PD3
-#define INT PD2
+#define CW	PB0							// Clockwise pin from encoder
+#define ACW PB1							// Anticlockwise pin from encoder
+#define PMW PB3							// PWM output pin
+#define DBG PD3							// Debug LED
+#define INT PD2							// Push button from encoder	
 
 volatile uint8_t buttonPress=0;
 
@@ -24,10 +24,9 @@ uint16_t encoder();
 
 uint16_t precision=1;					//Increments per click
 uint16_t currentDuty;					//Current Duty Value
-uint16_t maxDutyValue=102;				//Maximum Duty Value 
+uint16_t maxDutyValue=102;				//Maximum Duty Value (102 gets to 100% duty) 
   
 uint16_t currentFreq=100;				//Current Frequency Value
-uint16_t maxFreqValue=200;		 		//Maximum range
 
 uint8_t On=0;							// Off / On toggle
 
@@ -71,7 +70,7 @@ int main()
      {
 	  currentDuty=encoder(maxDutyValue,currentDuty);
 	  OCR1A=currentDuty;
-      DDRB |= (1<<PMW);					// PWM port set to output
+      DDRB |= (1<<PMW);					// PWM port set to output (turned on)
 	 }
  }	
 } 
@@ -103,9 +102,8 @@ uint16_t encoder(uint16_t max_encoder_value,uint16_t encoder_value)
 ISR(INT0_vect) 
 {
 	buttonPress=1;
-	debounce();
-	debounce();
-//	debounce();
+	debounce();						// 20ms delay
+	debounce();						// 20ms delay
 }	
 
 

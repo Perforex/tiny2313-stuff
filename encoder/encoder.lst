@@ -5,15 +5,15 @@ Sections:
 Idx Name          Size      VMA       LMA       File off  Algn
   0 .text         00000224  00000000  00000000  00000094  2**1
                   CONTENTS, ALLOC, LOAD, READONLY, CODE
-  1 .data         0000000a  00800060  00000224  000002b8  2**0
+  1 .data         00000008  00800060  00000224  000002b8  2**0
                   CONTENTS, ALLOC, LOAD, DATA
-  2 .bss          00000005  0080006a  0080006a  000002c2  2**0
+  2 .bss          00000005  00800068  00800068  000002c0  2**0
                   ALLOC
-  3 .stab         00000d80  00000000  00000000  000002c4  2**2
+  3 .stab         00000d74  00000000  00000000  000002c0  2**2
                   CONTENTS, READONLY, DEBUGGING
-  4 .stabstr      000009d6  00000000  00000000  00001044  2**0
+  4 .stabstr      000009c2  00000000  00000000  00001034  2**0
                   CONTENTS, READONLY, DEBUGGING
-  5 .comment      00000011  00000000  00000000  00001a1a  2**0
+  5 .comment      00000011  00000000  00000000  000019f6  2**0
                   CONTENTS, READONLY
 
 Disassembly of section .text:
@@ -54,13 +54,13 @@ Disassembly of section .text:
   38:	02 c0       	rjmp	.+4      	; 0x3e <__SP_L__+0x1>
   3a:	05 90       	lpm	r0, Z+
   3c:	0d 92       	st	X+, r0
-  3e:	aa 36       	cpi	r26, 0x6A	; 106
+  3e:	a8 36       	cpi	r26, 0x68	; 104
   40:	b1 07       	cpc	r27, r17
   42:	d9 f7       	brne	.-10     	; 0x3a <__do_copy_data+0xc>
 
 00000044 <__do_clear_bss>:
   44:	10 e0       	ldi	r17, 0x00	; 0
-  46:	aa e6       	ldi	r26, 0x6A	; 106
+  46:	a8 e6       	ldi	r26, 0x68	; 104
   48:	b0 e0       	ldi	r27, 0x00	; 0
   4a:	01 c0       	rjmp	.+2      	; 0x4e <.do_clear_bss_start>
 
@@ -68,7 +68,7 @@ Disassembly of section .text:
   4c:	1d 92       	st	X+, r1
 
 0000004e <.do_clear_bss_start>:
-  4e:	af 36       	cpi	r26, 0x6F	; 111
+  4e:	ad 36       	cpi	r26, 0x6D	; 109
   50:	b1 07       	cpc	r27, r17
   52:	e1 f7       	brne	.-8      	; 0x4c <.do_clear_bss_loop>
   54:	78 d0       	rcall	.+240    	; 0x146 <main>
@@ -84,41 +84,41 @@ uint16_t encoder(uint16_t max_encoder_value,uint16_t encoder_value)
  static uint8_t damper;						//Prevents over reporting
  
  state <<=2;								//Save previous state
-  5a:	20 91 68 00 	lds	r18, 0x0068
+  5a:	20 91 66 00 	lds	r18, 0x0066
   5e:	22 0f       	add	r18, r18
   60:	22 0f       	add	r18, r18
-  62:	20 93 68 00 	sts	0x0068, r18
+  62:	20 93 66 00 	sts	0x0066, r18
  if(PINB & (1 << ACW)) state |=(1<<0);		//Port 1
   66:	b1 9b       	sbis	0x16, 1	; 22
   68:	03 c0       	rjmp	.+6      	; 0x70 <encoder+0x16>
   6a:	21 60       	ori	r18, 0x01	; 1
-  6c:	20 93 68 00 	sts	0x0068, r18
+  6c:	20 93 66 00 	sts	0x0066, r18
  if(PINB & (1 << CW)) state |=(1<<1); 		//Port 2
   70:	b0 9b       	sbis	0x16, 0	; 22
   72:	05 c0       	rjmp	.+10     	; 0x7e <encoder+0x24>
-  74:	20 91 68 00 	lds	r18, 0x0068
+  74:	20 91 66 00 	lds	r18, 0x0066
   78:	22 60       	ori	r18, 0x02	; 2
-  7a:	20 93 68 00 	sts	0x0068, r18
+  7a:	20 93 66 00 	sts	0x0066, r18
  state &= 0x0f;								//Remove high order nibble
-  7e:	20 91 68 00 	lds	r18, 0x0068
+  7e:	20 91 66 00 	lds	r18, 0x0066
   82:	2f 70       	andi	r18, 0x0F	; 15
-  84:	20 93 68 00 	sts	0x0068, r18
+  84:	20 93 66 00 	sts	0x0066, r18
  if(damper)
-  88:	30 91 6c 00 	lds	r19, 0x006C
+  88:	30 91 6a 00 	lds	r19, 0x006A
   8c:	33 23       	and	r19, r19
   8e:	29 f0       	breq	.+10     	; 0x9a <encoder+0x40>
   {if(state!=15) return(encoder_value); 	//Prevent over reporting
   90:	2f 30       	cpi	r18, 0x0F	; 15
   92:	f9 f4       	brne	.+62     	; 0xd2 <encoder+0x78>
    else damper=0;}
-  94:	10 92 6c 00 	sts	0x006C, r1
+  94:	10 92 6a 00 	sts	0x006A, r1
   98:	1c c0       	rjmp	.+56     	; 0xd2 <encoder+0x78>
 
  if(state==0x0e && encoder_value < (max_encoder_value - precision))
   9a:	2e 30       	cpi	r18, 0x0E	; 14
   9c:	61 f4       	brne	.+24     	; 0xb6 <encoder+0x5c>
-  9e:	20 91 66 00 	lds	r18, 0x0066
-  a2:	30 91 67 00 	lds	r19, 0x0067
+  9e:	20 91 64 00 	lds	r18, 0x0064
+  a2:	30 91 65 00 	lds	r19, 0x0065
   a6:	82 1b       	sub	r24, r18
   a8:	93 0b       	sbc	r25, r19
   aa:	68 17       	cp	r22, r24
@@ -134,8 +134,8 @@ uint16_t encoder(uint16_t max_encoder_value,uint16_t encoder_value)
  if(state==0x0d && encoder_value > precision)
   b6:	2d 30       	cpi	r18, 0x0D	; 13
   b8:	61 f4       	brne	.+24     	; 0xd2 <encoder+0x78>
-  ba:	80 91 66 00 	lds	r24, 0x0066
-  be:	90 91 67 00 	lds	r25, 0x0067
+  ba:	80 91 64 00 	lds	r24, 0x0064
+  be:	90 91 65 00 	lds	r25, 0x0065
   c2:	86 17       	cp	r24, r22
   c4:	97 07       	cpc	r25, r23
   c6:	28 f4       	brcc	.+10     	; 0xd2 <encoder+0x78>
@@ -145,7 +145,7 @@ uint16_t encoder(uint16_t max_encoder_value,uint16_t encoder_value)
   ca:	79 0b       	sbc	r23, r25
    damper=1;   
   cc:	81 e0       	ldi	r24, 0x01	; 1
-  ce:	80 93 6c 00 	sts	0x006C, r24
+  ce:	80 93 6a 00 	sts	0x006A, r24
   } 
  return(encoder_value); 
 } 
@@ -171,7 +171,7 @@ uint16_t encoder(uint16_t max_encoder_value,uint16_t encoder_value)
   f4:	ef 93       	push	r30
   f6:	ff 93       	push	r31
   f8:	81 e0       	ldi	r24, 0x01	; 1
-  fa:	80 93 6b 00 	sts	0x006B, r24
+  fa:	80 93 69 00 	sts	0x0069, r24
   fe:	12 d0       	rcall	.+36     	; 0x124 <debounce>
  100:	11 d0       	rcall	.+34     	; 0x124 <debounce>
  102:	ff 91       	pop	r31
@@ -231,17 +231,17 @@ int main()
  14a:	8a 98       	cbi	0x11, 2	; 17
 
 	currentDuty=maxDutyValue/10;		// Start at 10% duty cycle
- 14c:	80 91 64 00 	lds	r24, 0x0064
- 150:	90 91 65 00 	lds	r25, 0x0065
+ 14c:	80 91 62 00 	lds	r24, 0x0062
+ 150:	90 91 63 00 	lds	r25, 0x0063
  154:	6a e0       	ldi	r22, 0x0A	; 10
  156:	70 e0       	ldi	r23, 0x00	; 0
  158:	4f d0       	rcall	.+158    	; 0x1f8 <__udivmodhi4>
- 15a:	70 93 6e 00 	sts	0x006E, r23
- 15e:	60 93 6d 00 	sts	0x006D, r22
+ 15a:	70 93 6c 00 	sts	0x006C, r23
+ 15e:	60 93 6b 00 	sts	0x006B, r22
 	
  	ICR1 = currentFreq;					// Frequency = 8,000,000/ICR1 
- 162:	80 91 62 00 	lds	r24, 0x0062
- 166:	90 91 63 00 	lds	r25, 0x0063
+ 162:	80 91 60 00 	lds	r24, 0x0060
+ 166:	90 91 61 00 	lds	r25, 0x0061
  16a:	95 bd       	out	0x25, r25	; 37
  16c:	84 bd       	out	0x24, r24	; 36
  	OCR1A = currentDuty;				// Duty cycle
@@ -297,25 +297,25 @@ int main()
  while (1) 
  {
 	if(buttonPress)
- 1a6:	80 91 6b 00 	lds	r24, 0x006B
+ 1a6:	80 91 69 00 	lds	r24, 0x0069
  1aa:	88 23       	and	r24, r24
  1ac:	61 f0       	breq	.+24     	; 0x1c6 <main+0x80>
 	 {
 		 On=!On;
  1ae:	81 e0       	ldi	r24, 0x01	; 1
- 1b0:	90 91 6a 00 	lds	r25, 0x006A
+ 1b0:	90 91 68 00 	lds	r25, 0x0068
  1b4:	91 11       	cpse	r25, r1
  1b6:	80 e0       	ldi	r24, 0x00	; 0
- 1b8:	80 93 6a 00 	sts	0x006A, r24
+ 1b8:	80 93 68 00 	sts	0x0068, r24
 		 buttonPress=0;
- 1bc:	10 92 6b 00 	sts	0x006B, r1
+ 1bc:	10 92 69 00 	sts	0x0069, r1
 		 PORTD ^= (1<<DBG); 
  1c0:	82 b3       	in	r24, 0x12	; 18
  1c2:	8c 27       	eor	r24, r28
  1c4:	82 bb       	out	0x12, r24	; 18
 	 }	 
     if(!On)
- 1c6:	80 91 6a 00 	lds	r24, 0x006A
+ 1c6:	80 91 68 00 	lds	r24, 0x0068
  1ca:	81 11       	cpse	r24, r1
  1cc:	04 c0       	rjmp	.+8      	; 0x1d6 <main+0x90>
      {
@@ -329,17 +329,17 @@ int main()
     else 
      {
 	  currentDuty=encoder(maxDutyValue,currentDuty);
- 1d6:	60 91 6d 00 	lds	r22, 0x006D
- 1da:	70 91 6e 00 	lds	r23, 0x006E
- 1de:	80 91 64 00 	lds	r24, 0x0064
- 1e2:	90 91 65 00 	lds	r25, 0x0065
+ 1d6:	60 91 6b 00 	lds	r22, 0x006B
+ 1da:	70 91 6c 00 	lds	r23, 0x006C
+ 1de:	80 91 62 00 	lds	r24, 0x0062
+ 1e2:	90 91 63 00 	lds	r25, 0x0063
  1e6:	39 df       	rcall	.-398    	; 0x5a <encoder>
- 1e8:	90 93 6e 00 	sts	0x006E, r25
- 1ec:	80 93 6d 00 	sts	0x006D, r24
+ 1e8:	90 93 6c 00 	sts	0x006C, r25
+ 1ec:	80 93 6b 00 	sts	0x006B, r24
 	  OCR1A=currentDuty;
  1f0:	9b bd       	out	0x2b, r25	; 43
  1f2:	8a bd       	out	0x2a, r24	; 42
-      DDRB |= (1<<PMW);					// PWM port set to output
+      DDRB |= (1<<PMW);					// PWM port set to output (turned on)
  1f4:	bb 9a       	sbi	0x17, 3	; 23
  1f6:	d7 cf       	rjmp	.-82     	; 0x1a6 <main+0x60>
 
